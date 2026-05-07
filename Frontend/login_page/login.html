@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Krishi Officer | Welcome</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="login.css">
+</head>
+<body>
+
+<div class="page">
+
+    <!-- ── Left hero panel ──────────────────────────────────────── -->
+    <section class="hero">
+        <div class="hero-inner">
+            <div class="hero-logo">🌾</div>
+            <span class="hero-tag">AI-Powered · Punjab Government Schemes · Free</span>
+            <h1 class="hero-title">Digital<br>Krishi Officer</h1>
+            <p class="hero-sub">
+                Get instant, expert-level agricultural advice in English, Hindi, and Punjabi —
+                backed by real Punjab schemes, live weather data, and AI crop diagnostics.
+            </p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feat-icon">🔬</div>
+                    <div>
+                        <div class="feat-title">Disease Detection</div>
+                        <div class="feat-desc">Upload a leaf photo for instant AI diagnosis across 38 crop diseases.</div>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feat-icon">🏛</div>
+                    <div>
+                        <div class="feat-title">Scheme Guidance</div>
+                        <div class="feat-desc">PM-KISAN, PMFBY, Kisan Credit Card and 13+ Punjab schemes explained instantly.</div>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feat-icon">🌤</div>
+                    <div>
+                        <div class="feat-title">Weather-Aware</div>
+                        <div class="feat-desc">Live weather context woven into every piece of advice for your location.</div>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feat-icon">🗣</div>
+                    <div>
+                        <div class="feat-title">3 Languages</div>
+                        <div class="feat-desc">Full support for English, हिंदी, and ਪੰਜਾਬੀ — voice input &amp; output included.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Right auth panel ──────────────────────────────────────── -->
+    <section class="auth-section">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="auth-logo">🌾</div>
+                <h2 class="auth-title">Welcome back</h2>
+                <p class="auth-sub">Sign in to access your advisory history</p>
+            </div>
+
+            <div class="tabs">
+                <button class="tab is-active" id="signInTab"  onclick="switchTab('signin')">Sign In</button>
+                <button class="tab"           id="signUpTab"  onclick="switchTab('signup')">Sign Up</button>
+            </div>
+
+            <p id="authStatus" class="status-msg"></p>
+
+            <!-- Sign In form -->
+            <form id="signInForm" class="auth-form" onsubmit="loginUser(event)">
+                <div class="field">
+                    <label for="loginUsername">Username</label>
+                    <input id="loginUsername" type="text" placeholder="Enter your username" required autocomplete="username">
+                </div>
+                <div class="field">
+                    <label for="loginPassword">Password</label>
+                    <input id="loginPassword" type="password" placeholder="Enter your password" required autocomplete="current-password">
+                </div>
+                <button class="btn-primary" type="submit">Sign In →</button>
+            </form>
+
+            <!-- Sign Up form -->
+            <form id="signUpForm" class="auth-form hidden" onsubmit="signupUser(event)">
+                <div class="field">
+                    <label for="signupUsername">Choose Username <span class="hint">(min 3 chars)</span></label>
+                    <input id="signupUsername" type="text" placeholder="Pick a unique username" required minlength="3" autocomplete="username">
+                </div>
+                <div class="field">
+                    <label for="signupPassword">Password <span class="hint">(min 6 chars)</span></label>
+                    <input id="signupPassword" type="password" placeholder="Create a strong password" required minlength="6" autocomplete="new-password">
+                </div>
+                <div class="field">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input id="confirmPassword" type="password" placeholder="Re-enter your password" required minlength="6" autocomplete="new-password">
+                </div>
+                <button class="btn-primary" type="submit">Create Account →</button>
+            </form>
+
+            <div class="divider"><span>or</span></div>
+
+            <button class="btn-guest" onclick="continueAsGuest()">
+                Continue as Guest — No Sign-in Needed
+            </button>
+            <p class="guest-note">Guest mode gives full access. Sign in only to save your query history.</p>
+        </div>
+
+        <footer class="auth-footer">
+            AI responses are advisory only · Always consult a local agronomist for critical decisions
+        </footer>
+    </section>
+
+</div>
+
+<script src="login.js"></script>
+</body>
+</html>

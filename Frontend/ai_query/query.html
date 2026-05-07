@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Krishi Officer | AI Advisory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="query.css">
+</head>
+<body>
+
+<div class="app">
+
+    <!-- ── Header ─────────────────────────────────────────────────── -->
+    <header class="header">
+        <div class="header-brand">
+            <span class="brand-icon">🌾</span>
+            <div>
+                <div class="brand-title">Digital Krishi Officer</div>
+                <div class="brand-sub">Punjab AI Advisory · Policy + Weather Aware</div>
+            </div>
+        </div>
+        <div class="header-controls">
+            <select id="languageSelect" class="lang-select" title="Response language">
+                <option value="en">English</option>
+                <option value="hi">हिंदी</option>
+                <option value="pa">ਪੰਜਾਬੀ</option>
+            </select>
+            <span id="userBadge" class="user-chip">Guest</span>
+            <a class="hdr-btn" href="../feedback_form/feedback_form.html" target="_blank" title="Give Feedback">Feedback</a>
+            <button class="hdr-btn" onclick="logout()" title="Sign Out">Sign Out</button>
+        </div>
+    </header>
+
+    <!-- ── Quick actions + Settings toggle ───────────────────────── -->
+    <div class="chips-bar">
+        <button class="chip" onclick="fillPrompt('Suggest treatment for early blight in tomato.')">🍅 Tomato blight</button>
+        <button class="chip" onclick="fillPrompt('What is the best fertilizer schedule for wheat this month?')">🌾 Fertilizer schedule</button>
+        <button class="chip" onclick="fillPrompt('How can I prevent leaf spot disease naturally?')">🌿 Disease prevention</button>
+        <button class="chip" onclick="fillPrompt('Which Punjab government scheme can help me with irrigation?')">🏛 Schemes</button>
+        <button class="chip chip-settings" id="settingsToggle" onclick="toggleSettings()">⚙ Farmer Profile</button>
+    </div>
+
+    <!-- ── Collapsible farmer profile panel ──────────────────────── -->
+    <div class="settings-panel" id="settingsPanel">
+        <div class="setting-group">
+            <label>Crop Type</label>
+            <input id="cropType" type="text" placeholder="e.g. wheat, paddy">
+        </div>
+        <div class="setting-group">
+            <label>Season</label>
+            <select id="seasonSelect">
+                <option value="">Select Season</option>
+                <option value="kharif">Kharif</option>
+                <option value="rabi">Rabi</option>
+            </select>
+        </div>
+        <div class="setting-group">
+            <label>Land Size</label>
+            <input id="landSize" type="text" placeholder="e.g. 3 acres">
+        </div>
+        <div class="setting-group">
+            <label>Irrigation Type</label>
+            <select id="irrigationSelect">
+                <option value="">Select Irrigation</option>
+                <option value="flood">Flood</option>
+                <option value="drip">Drip</option>
+                <option value="sprinkler">Sprinkler</option>
+                <option value="tube well">Tube Well</option>
+            </select>
+        </div>
+        <div class="setting-group setting-checks">
+            <label>Options</label>
+            <label class="check-row">
+                <input id="groundwaterStress" type="checkbox">
+                Groundwater stress
+            </label>
+            <label class="check-row">
+                <input id="mspDependency" type="checkbox">
+                MSP dependency
+            </label>
+            <label class="check-row">
+                <input id="speakReply" type="checkbox">
+                Speak AI reply
+            </label>
+        </div>
+        <div class="setting-group settings-actions">
+            <label>Tools</label>
+            <button class="action-btn" onclick="captureLocation()">📍 Use My Location</button>
+        </div>
+    </div>
+
+    <!-- ── Chat area ─────────────────────────────────────────────── -->
+    <div class="chat-area" id="chatBox">
+        <div class="message ai">
+            <img src="../assets/avatar.png" class="avatar" alt="AI">
+            <div class="bubble">
+                <strong>ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! नमस्ते! Hello! 👋</strong><br><br>
+                I am your AI Farming Assistant. Ask me about:<br>
+                🌱 Crop diseases &amp; treatments<br>
+                💧 Irrigation &amp; soil health<br>
+                🏛 Government schemes &amp; MSP<br>
+                🌤 Weather-based advice<br><br>
+                <em>Set your Farmer Profile above for personalised advice.</em>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Input bar ─────────────────────────────────────────────── -->
+    <div class="input-bar">
+        <button class="icon-btn" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice input">🎤</button>
+        <input type="text" id="userInput" placeholder="Type your farming question…" autocomplete="off">
+        <label class="icon-btn" title="Upload leaf image">
+            📸
+            <input type="file" id="imageInput" accept="image/*" style="display:none">
+        </label>
+        <button class="send-btn" onclick="sendMessage()">Send ➤</button>
+    </div>
+
+    <!-- ── Footer ────────────────────────────────────────────────── -->
+    <footer class="footer">
+        AI responses are advisory only · Always consult a local agronomist for critical decisions ·
+        <a href="../feedback_form/feedback_form.html" target="_blank">Share Feedback</a>
+    </footer>
+
+</div>
+
+<script src="query.js"></script>
+</body>
+</html>

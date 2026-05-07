@@ -1,0 +1,13 @@
+# Virtual environment
+farmer-ai-tf/
+
+# Python cache
+__pycache__/
+
+# Environment variables (sensitive keys)
+.env
+*.env
+
+# Logs
+*.log
+app.log
