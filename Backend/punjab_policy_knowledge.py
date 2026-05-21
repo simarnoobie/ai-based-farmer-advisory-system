@@ -1,5 +1,9 @@
 from typing import Dict, List
 
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
 POLICY_DOCS: List[Dict[str, str]] = [
     {
         "title": "PM-KISAN",
@@ -105,19 +109,21 @@ POLICY_DOCS: List[Dict[str, str]] = [
     },
 ]
 
+# Pre-compute TF-IDF matrix at module load time for fast query-time retrieval.
+# Each document is the concatenation of its title, content, and tags so all
+# fields contribute to relevance scoring.
+_corpus = [
+    f"{d['title']} {d['content']} {d['tags']}"
+    for d in POLICY_DOCS
+]
+_vectorizer = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
+_tfidf_matrix = _vectorizer.fit_transform(_corpus)
+
 
 def retrieve_policy_context(query: str, top_k: int = 4) -> List[Dict[str, str]]:
-    q = (query or "").lower()
-    scored = []
-
-    for doc in POLICY_DOCS:
-        bag = f"{doc['title']} {doc['content']} {doc['tags']}".lower()
-        score = 0
-        for token in q.split():
-            if len(token) > 2 and token in bag:
-                score += 1
-        if score > 0:
-            scored.append((score, doc))
-
-    scored.sort(key=lambda item: item[0], reverse=True)
-    return [item[1] for item in scored[:top_k]]
+    if not query or not query.strip():
+        return []
+    query_vec = _vectorizer.transform([query.lower()])
+    scores = cosine_similarity(query_vec, _tfidf_matrix).flatten()
+    top_indices = np.argsort(scores)[::-1][:top_k]
+    return [POLICY_DOCS[i] for i in top_indices if scores[i] > 0.0]

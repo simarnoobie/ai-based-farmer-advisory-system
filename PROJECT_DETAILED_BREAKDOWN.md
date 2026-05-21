@@ -5,7 +5,10 @@
 This is a **full-stack AI-powered web application** that helps farmers with:
 1. **Plant Disease Detection** - Upload leaf images to identify diseases
 2. **AI-Powered Agricultural Advice** - Get expert farming guidance via chat
-3. **Query History** - Track all interactions in a database
+3. **Voice & Speech Interaction** - Speak questions and hear recommendations in English, Hindi, or Punjabi
+4. **Weather-Aware Local Advice** - Use the farmer’s location to fetch live weather updates for precise recommendations
+5. **Policy-Aware RAG Guidance** - Use Punjab agricultural policy knowledge to enrich answers with relevant schemes and government support
+6. **Query History** - Track all interactions in a database
 
 ---
 
@@ -69,8 +72,15 @@ This is a **full-stack AI-powered web application** that helps farmers with:
      4. Get disease prediction
    - **AI Chat Flow:**
      1. If image uploaded: Prepends diagnosis to query
-     2. Sends to Ollama (Gemma 3:1b model)
-     3. Gets AI response (agronomist advice)
+     2. Assembles context from farmer profile, location-based weather, and Punjab policy knowledge
+     3. Sends the combined query to Ollama (Gemma 3:1b model)
+     4. Handles English, Hindi, and Punjabi responses with language-constrained output
+   - **Weather & Location:**
+     - Uses browser geolocation to fetch live weather data for the farmer’s coordinates
+     - Embeds current temperature, humidity, precipitation, and wind in the advisory context
+   - **Policy-Aware RAG:**
+     - Retrieves Punjab policy snippets from `Backend/punjab_policy_knowledge.py`
+     - Uses these documents to ground AI responses in government schemes and agrarian programs
    - **Database:**
      - Saves query and response to `chat_history` table
 
@@ -141,12 +151,18 @@ pydantic             # Data validation
      - `user_id`
      - `query` (optional text)
      - `file` (optional image)
+     - `language` selection for English, Hindi, or Punjabi
+     - farmer profile metadata (crop, season, land size, irrigation, groundwater stress, MSP dependency)
+     - geolocation coordinates for weather-aware advice
    - POSTs to `http://127.0.0.1:8000/ask`
    - Displays response with disease diagnosis if image uploaded
+   - Uses browser speech synthesis to speak the AI response when enabled
 
 3. **Event Listeners:**
    - File input change → auto-sends image
    - Enter key → sends text query
+   - Microphone button → triggers voice input
+   - Location button → captures current coordinates for weather context
 
 #### **`Frontend/ai_query/query.css`**
 - Chat interface styling

@@ -7,3 +7,9 @@ pillow
 numpy
 python-multipart
 pydantic
+bcrypt
+PyJWT
+scikit-learn
+groq
+boto3
+redis

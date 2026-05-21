@@ -1,13 +1,29 @@
-# Virtual environment
+# Virtual environments
 farmer-ai-tf/
+Backend/venv/
+Backend/.venv/
+venv/
+.venv/
 
 # Python cache
 __pycache__/
+*.pyc
+*.pyo
 
 # Environment variables (sensitive keys)
 .env
 *.env
+!.env.docker.example
+!Backend/.env.example
 
 # Logs
 *.log
 app.log
+
+# ML model binaries (stored in S3, not git)
+*.h5
+*.keras
+
+# IDE
+.vscode/
+.idea/

@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = window.BACKEND_URL || "http://127.0.0.1:8000";
 
 const authStatus = document.getElementById("authStatus");
 const signInForm = document.getElementById("signInForm");
@@ -48,7 +48,7 @@ async function loginUser(event) {
             return;
         }
 
-        localStorage.setItem("farmer_user_id", String(result.user_id));
+        localStorage.setItem("farmer_token", result.token);
         localStorage.setItem("farmer_username", username);
         setStatus("Signed in successfully.");
         gotoQuery();
@@ -92,7 +92,7 @@ async function signupUser(event) {
 }
 
 function continueAsGuest() {
-    localStorage.removeItem("farmer_user_id");
+    localStorage.removeItem("farmer_token");
     localStorage.setItem("farmer_username", "Guest");
     gotoQuery();
 }

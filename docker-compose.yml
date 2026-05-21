@@ -1,0 +1,103 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Load project-root .env for variable substitution below.
+# Copy .env.docker.example → .env in this folder before running.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── FastAPI backend ─────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: farmer_ai_backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Database — points to the mysql service below, not localhost
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      DB_NAME: farmer_ai
+
+      # Auth
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRY_HOURS: 24
+
+      # CORS — set ALLOWED_ORIGINS in .env for production (e.g. your EC2 public IP)
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost,http://localhost:80}
+
+      # LLM — set GROQ_API_KEY to use Groq instead of Ollama
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama3-8b-8192}
+
+      # Redis rate limiting
+      REDIS_URL: redis://redis:6379/0
+
+      # S3 model weights (leave blank if using volume mount below)
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_MODEL_KEY: ${S3_MODEL_KEY:-models/trained_farmer_model.h5}
+    volumes:
+      # Mount local model file so Docker doesn't need S3 during development.
+      # Writable so the container can download from S3 on first startup.
+      - ./Backend/models:/app/models
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  # ── Frontend (nginx static server) ─────────────────────────────────────────
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    container_name: farmer_ai_frontend
+    ports:
+      - "80:80"
+    environment:
+      # Tell the browser JS where the backend lives.
+      # In production set this to your EC2 public IP or domain, e.g.:
+      #   BACKEND_URL=http://54.123.45.67:8000
+      BACKEND_URL: ${BACKEND_URL:-http://localhost:8000}
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ── MySQL 8 ─────────────────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: farmer_ai_mysql
+    ports:
+      - "3307:3306"   # 3307 on host to avoid clashing with a local MySQL
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: farmer_ai
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+
+  # ── Redis (rate limiting + future caching) ──────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: farmer_ai_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+    driver: local

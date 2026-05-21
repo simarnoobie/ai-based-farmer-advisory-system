@@ -1,0 +1,100 @@
+name: CD — Build, Push & Deploy to AWS
+
+# Only runs when CI passes on the main branch
+on:
+  workflow_run:
+    workflows: ["CI — Test & Lint"]
+    branches: [main]
+    types: [completed]
+
+jobs:
+  deploy:
+    name: Deploy to AWS ECS
+    runs-on: ubuntu-latest
+
+    # Only proceed if CI actually passed (not if it was skipped or failed)
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      # 1. Check out code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Configure AWS credentials from GitHub Secrets
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      # 3. Log in to Amazon ECR (our private Docker image registry)
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 4. Build and push the backend Docker image to ECR
+      - name: Build & push backend image
+        id: build-backend
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG:     ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/${{ secrets.ECR_BACKEND_REPO }}:$IMAGE_TAG ./Backend
+          docker push    $ECR_REGISTRY/${{ secrets.ECR_BACKEND_REPO }}:$IMAGE_TAG
+          # Also tag as "latest" so ECS can always pull the newest image
+          docker tag  $ECR_REGISTRY/${{ secrets.ECR_BACKEND_REPO }}:$IMAGE_TAG \
+                      $ECR_REGISTRY/${{ secrets.ECR_BACKEND_REPO }}:latest
+          docker push $ECR_REGISTRY/${{ secrets.ECR_BACKEND_REPO }}:latest
+          echo "image=$ECR_REGISTRY/${{ secrets.ECR_BACKEND_REPO }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      # 5. Build and push the frontend Docker image to ECR
+      - name: Build & push frontend image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG:     ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/${{ secrets.ECR_FRONTEND_REPO }}:$IMAGE_TAG ./Frontend
+          docker push    $ECR_REGISTRY/${{ secrets.ECR_FRONTEND_REPO }}:$IMAGE_TAG
+          docker tag  $ECR_REGISTRY/${{ secrets.ECR_FRONTEND_REPO }}:$IMAGE_TAG \
+                      $ECR_REGISTRY/${{ secrets.ECR_FRONTEND_REPO }}:latest
+          docker push $ECR_REGISTRY/${{ secrets.ECR_FRONTEND_REPO }}:latest
+
+      # 6. Update ECS service to use the new backend image
+      - name: Deploy backend to ECS
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG:     ${{ github.sha }}
+        run: |
+          # Download current task definition
+          aws ecs describe-task-definition \
+            --task-definition ${{ secrets.ECS_BACKEND_TASK_DEFINITION }} \
+            --query taskDefinition > task-def.json
+
+          # Swap in the new image URI
+          NEW_IMAGE="$ECR_REGISTRY/${{ secrets.ECR_BACKEND_REPO }}:$IMAGE_TAG"
+          jq --arg IMAGE "$NEW_IMAGE" \
+            '.containerDefinitions[0].image = $IMAGE
+             | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                   .placementConstraints, .compatibilities, .registeredAt, .registeredBy)' \
+            task-def.json > new-task-def.json
+
+          # Register the updated task definition
+          NEW_TASK_DEF=$(aws ecs register-task-definition \
+            --cli-input-json file://new-task-def.json \
+            --query 'taskDefinition.taskDefinitionArn' --output text)
+
+          # Update the ECS service to use the new task
+          aws ecs update-service \
+            --cluster  ${{ secrets.ECS_CLUSTER }} \
+            --service  ${{ secrets.ECS_BACKEND_SERVICE }} \
+            --task-definition "$NEW_TASK_DEF" \
+            --force-new-deployment
+
+      # 7. Wait for the new deployment to become stable
+      - name: Wait for ECS deployment
+        run: |
+          aws ecs wait services-stable \
+            --cluster ${{ secrets.ECS_CLUSTER }} \
+            --services ${{ secrets.ECS_BACKEND_SERVICE }}
+          echo "✅ Deployment complete."

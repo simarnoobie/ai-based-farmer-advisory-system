@@ -14,7 +14,7 @@ const voiceBtn         = document.getElementById("voiceBtn");
 const settingsPanel    = document.getElementById("settingsPanel");
 const settingsToggle   = document.getElementById("settingsToggle");
 
-const API_BASE_URL = "http://127.0.0.1:8000";
+const API_BASE_URL = window.BACKEND_URL || "http://127.0.0.1:8000";
 
 // ── Init ───────────────────────────────────────────────────────────
 const username = localStorage.getItem("farmer_username") || "Guest";
@@ -73,7 +73,7 @@ function fillPrompt(text) {
 }
 
 function logout() {
-    localStorage.removeItem("farmer_user_id");
+    localStorage.removeItem("farmer_token");
     localStorage.removeItem("farmer_username");
     window.location.href = "../login_page/login.html";
 }
@@ -192,7 +192,7 @@ function captureLocation() {
 // ── Send message ───────────────────────────────────────────────────
 async function sendMessage(file = null) {
     const question = userInput.value.trim();
-    const userId   = localStorage.getItem("farmer_user_id");
+    const token    = localStorage.getItem("farmer_token");
 
     if (!question && !file) return;
 
@@ -206,7 +206,6 @@ async function sendMessage(file = null) {
     appendMessage("ai", "", true); // loader
 
     const fd = new FormData();
-    if (userId)                      fd.append("user_id",    userId);
     if (question)                    fd.append("query",      question);
     if (file)                        fd.append("file",       file);
     fd.append("language", languageSelect.value || "en");
@@ -220,7 +219,9 @@ async function sendMessage(file = null) {
     if (currentLocation.longitude !== null) fd.append("longitude", currentLocation.longitude);
 
     try {
-        const res = await fetch(`${API_BASE_URL}/ask`, { method: "POST", body: fd });
+        const headers = {};
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const res = await fetch(`${API_BASE_URL}/ask`, { method: "POST", body: fd, headers });
 
         document.getElementById("ai-thinking")?.remove();
 
@@ -237,7 +238,16 @@ async function sendMessage(file = null) {
         let output = safeResponse;
 
         if (data.detected) {
-            output = `<strong>🔬 Diagnosis:</strong> ${escapeHtml(data.detected)}<br><br>${safeResponse}`;
+            const pct = data.confidence != null
+                ? ` <span style="opacity:.75">(${Math.round(data.confidence * 100)}% confidence)</span>`
+                : '';
+            output = `<strong>🔬 Diagnosis:</strong> ${escapeHtml(data.detected)}${pct}<br><br>${safeResponse}`;
+            if (Array.isArray(data.top3) && data.top3.length > 1) {
+                const alts = data.top3.slice(1)
+                    .map(p => `${escapeHtml(p.class)} (${Math.round(p.confidence * 100)}%)`)
+                    .join(' · ');
+                output += `<div class="policy-ref">📊 <strong>Other possibilities:</strong> ${alts}</div>`;
+            }
         }
         if (Array.isArray(data.policies) && data.policies.length > 0) {
             const refs = data.policies

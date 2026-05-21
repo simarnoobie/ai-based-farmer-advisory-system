@@ -1,0 +1,38 @@
+# Virtual environments
+Backend/.venv/
+Backend/venv/
+**/.venv/
+**/venv/
+
+# Python cache
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Secrets — never bake into image
+Backend/.env
+.env
+
+# Logs
+**/*.log
+
+# ML model binaries — mounted as volume or pulled from S3
+Backend/models/*.h5
+Backend/models/*.keras
+
+# Test files — not needed in production image
+Backend/tests/
+Backend/pytest.ini
+Backend/requirements-dev.txt
+
+# IDE / OS junk
+.git/
+.gitignore
+**/.DS_Store
+.vscode/
+.idea/
+
+# Docs
+*.md
+LICENSE
+Notebook/
