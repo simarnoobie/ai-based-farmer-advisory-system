@@ -660,6 +660,12 @@ async def ask_farmer_bot(
         }.get(language, "Respond in simple English only.")
 
         # --- LLM call ---
+        # Language reminder appended to user turn for models that ignore system prompt
+        _lang_reminder = {
+            "hi": "\n\nREMINDER: ऊपर का पूरा उत्तर केवल हिंदी देवनागरी में लिखें। अंग्रेज़ी का एक भी शब्द न लिखें।",
+            "pa": "\n\nREMINDER: ਉੱਪਰ ਦਾ ਪੂਰਾ ਜਵਾਬ ਕੇਵਲ ਪੰਜਾਬੀ ਗੁਰਮੁਖੀ ਲਿਪੀ ਵਿੱਚ ਲਿਖੋ। ਕੋਈ ਅੰਗਰੇਜ਼ੀ ਸ਼ਬਦ ਨਹੀਂ।",
+        }.get(language, "")
+
         _messages = [
             {
                 "role": "system",
@@ -682,6 +688,7 @@ async def ask_farmer_bot(
                     f"Farmer profile: {profile}\n"
                     f"Weather: {weather}\n"
                     f"Relevant policy context (use only if directly applicable):\n{policy_block}"
+                    f"{_lang_reminder}"
                 ),
             },
         ]
@@ -690,12 +697,17 @@ async def ask_farmer_bot(
                 completion = _groq_client.chat.completions.create(
                     model=GROQ_MODEL,
                     messages=_messages,
-                    max_tokens=300,
+                    max_tokens=450,
+                    temperature=0.3,
                 )
                 ai_msg = completion.choices[0].message.content
                 log.info("Groq response received (%d chars).", len(ai_msg))
             else:
-                llm_response = OLLAMA_CLIENT.chat(model=OLLAMA_MODEL, messages=_messages)
+                llm_response = OLLAMA_CLIENT.chat(
+                    model=OLLAMA_MODEL,
+                    messages=_messages,
+                    options={"num_predict": 450, "temperature": 0.3},
+                )
                 ai_msg = llm_response.message.content
                 log.info("Ollama response received (%d chars).", len(ai_msg))
         except Exception:

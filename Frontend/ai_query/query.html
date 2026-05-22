@@ -130,12 +130,19 @@
                 </div>
             </div>
 
+            <!-- Image attachment preview (shown when file is selected but not yet sent) -->
+            <div id="imagePreviewBar" class="image-preview-bar" style="display:none">
+                <img id="imageThumb" class="img-thumb" src="" alt="preview">
+                <span id="imagePreviewLabel" class="img-preview-label"></span>
+                <button class="remove-img-btn" onclick="clearImageAttachment()" title="Remove image">✕</button>
+            </div>
+
             <!-- Input bar -->
             <div class="input-bar">
                 <button class="icon-btn" id="voiceBtn" onclick="toggleVoiceInput()" title="Voice input">🎤</button>
                 <button class="icon-btn stop-btn" id="stopAudioBtn" onclick="stopAudio()" title="Stop audio" style="display:none">⏹</button>
                 <input type="text" id="userInput" placeholder="Ask your farming question…" autocomplete="off">
-                <label class="icon-btn upload-btn" title="Upload leaf image for disease diagnosis">
+                <label class="icon-btn upload-btn" title="Attach leaf image for disease diagnosis">
                     📸
                     <input type="file" id="imageInput" accept="image/*" style="display:none">
                 </label>

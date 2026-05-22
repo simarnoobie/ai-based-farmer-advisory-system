@@ -23,6 +23,7 @@ let currentLocation = { latitude: null, longitude: null };
 let recognition     = null;
 let listening       = false;
 let sidebarOpen     = true;
+let pendingFile     = null;
 
 // Pre-load TTS voices
 let _voices = [];
@@ -240,19 +241,23 @@ function captureLocation() {
 }
 
 // ── Send message ───────────────────────────────────────────────────
-async function sendMessage(file = null) {
+async function sendMessage() {
+    const file     = pendingFile;
     const question = userInput.value.trim();
     const token    = localStorage.getItem("farmer_token");
 
     if (!question && !file) return;
 
-    if (file) {
-        appendMessage("user", "📸 <em>Sent a leaf image for diagnosis…</em>");
+    if (file && question) {
+        appendMessage("user", `📸 <em>${escapeHtml(file.name)}</em><br>${escapeHtml(question).replace(/\n/g, "<br>")}`);
+    } else if (file) {
+        appendMessage("user", `📸 <em>${escapeHtml(file.name)} — sent for diagnosis</em>`);
     } else {
         appendMessage("user", escapeHtml(question).replace(/\n/g, "<br>"));
     }
 
     userInput.value = "";
+    clearImageAttachment();
     appendMessage("ai", "", true);
 
     const fd = new FormData();
@@ -286,8 +291,17 @@ async function sendMessage(file = null) {
         let output = safeResponse;
 
         if (data.detected) {
-            const pct = data.confidence != null
-                ? ` <span style="opacity:.75">(${Math.round(data.confidence * 100)}% confidence)</span>` : "";
+            let confLabel = "";
+            let confColor = "#888";
+            if (data.confidence != null) {
+                const pct = Math.round(data.confidence * 100);
+                if (pct >= 80)      { confColor = "#1e8a4a"; confLabel = `${pct}% — High confidence`; }
+                else if (pct >= 55) { confColor = "#e67e22"; confLabel = `${pct}% — Moderate confidence`; }
+                else                { confColor = "#c0392b"; confLabel = `${pct}% — Low confidence, verify manually`; }
+            }
+            const pct = confLabel
+                ? ` <span style="color:${confColor};font-size:0.82rem" title="Model certainty: how sure the AI is about this disease based on the leaf image">(${confLabel})</span>`
+                : "";
             output = `<strong>🔬 Diagnosis:</strong> ${escapeHtml(data.detected)}${pct}<br><br>${safeResponse}`;
             if (Array.isArray(data.top3) && data.top3.length > 1) {
                 const alts = data.top3.slice(1)
@@ -316,9 +330,26 @@ async function sendMessage(file = null) {
     }
 }
 
+// ── Image attachment helpers ───────────────────────────────────────
+function clearImageAttachment() {
+    pendingFile = null;
+    imageInput.value = "";
+    document.getElementById("imagePreviewBar").style.display = "none";
+    document.getElementById("imageThumb").src = "";
+    userInput.placeholder = "Ask your farming question…";
+}
+
 // ── Event listeners ────────────────────────────────────────────────
 imageInput.addEventListener("change", (e) => {
-    if (e.target.files.length > 0) sendMessage(e.target.files[0]);
+    if (!e.target.files.length) return;
+    pendingFile = e.target.files[0];
+    const url = URL.createObjectURL(pendingFile);
+    document.getElementById("imageThumb").src = url;
+    document.getElementById("imagePreviewLabel").textContent =
+        `📸 ${pendingFile.name}  —  type a question or click Send to diagnose`;
+    document.getElementById("imagePreviewBar").style.display = "flex";
+    userInput.placeholder = "Add a question about this image (optional)…";
+    userInput.focus();
 });
 
 userInput.addEventListener("keydown", (e) => {
