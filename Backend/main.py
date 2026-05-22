@@ -358,27 +358,26 @@ def get_weather_context(lat: Optional[float], lon: Optional[float]) -> str:
 # Fallback advice (when Ollama is unreachable)
 # ---------------------------------------------------------------------------
 def build_fallback_advice(query: str, policy_hits: list, weather: str, language: str) -> str:
-    policy_text = "; ".join(f"{p['title']}: {p['content']}" for p in policy_hits[:2]) or "No direct policy match."
-    base = (
-        f"Advisory for your query: {query}. "
-        f"Relevant schemes: {policy_text}. "
-        f"Weather: {weather}. "
-        "For paddy in summer prefer controlled irrigation (drip/sprinkler where feasible), "
-        "avoid excess urea, and follow Soil Health Card recommendations."
-    )
+    scheme_names = ", ".join(p["title"] for p in policy_hits[:2]) if policy_hits else None
+    scheme_note  = f"Relevant schemes: {scheme_names}. " if scheme_names else ""
+    weather_note = f"Current weather: {weather} " if "unavailable" not in weather else ""
     if language == "hi":
         return (
-            "त्वरित सलाह: संतुलित सिंचाई अपनाएं, अत्यधिक यूरिया से बचें, "
-            "Soil Health Card की सिफारिशें मानें। "
-            f"मौसम: {weather}"
+            f"आपके सवाल के लिए सलाह: {scheme_note}{weather_note}\n"
+            "संतुलित सिंचाई अपनाएं, अत्यधिक यूरिया से बचें और Soil Health Card की सिफारिशें मानें। "
+            "अपने स्थानीय कृषि विशेषज्ञ से भी संपर्क करें।"
         )
     if language == "pa":
         return (
-            "ਤੁਰੰਤ ਸਲਾਹ: ਸੰਤੁਲਿਤ ਸਿੰਚਾਈ ਕਰੋ, ਵਾਧੂ ਯੂਰੀਆ ਤੋਂ ਬਚੋ, "
-            "Soil Health Card ਦੀ ਸਿਫ਼ਾਰਸ਼ ਮੰਨੋ। "
-            f"ਮੌਸਮ: {weather}"
+            f"ਤੁਹਾਡੇ ਸਵਾਲ ਦੀ ਸਲਾਹ: {scheme_note}{weather_note}\n"
+            "ਸੰਤੁਲਿਤ ਸਿੰਚਾਈ ਕਰੋ, ਵਾਧੂ ਯੂਰੀਆ ਤੋਂ ਬਚੋ ਅਤੇ Soil Health Card ਦੀ ਸਿਫ਼ਾਰਸ਼ ਮੰਨੋ।"
         )
-    return base
+    return (
+        f"{scheme_note}{weather_note}\n"
+        "Based on best practices for Punjab farming: use balanced irrigation (drip/sprinkler preferred), "
+        "avoid excess urea, follow your Soil Health Card recommendations, and consult your local agronomist "
+        "for field-specific advice."
+    )
 
 # ---------------------------------------------------------------------------
 # Pydantic request models
@@ -551,6 +550,24 @@ async def ask_farmer_bot(
     if not _check_rate_limit(client_ip):
         raise HTTPException(429, "Too many requests. Please wait a minute.")
 
+    # Greeting shortcut — skip LLM for simple greetings
+    _GREETINGS = {"hi", "hello", "hey", "hii", "helo", "howdy", "yo",
+                  "namaste", "namaskar", "sat sri akal", "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ", "नमस्ते"}
+    _raw_q = (query or "").strip().lower().rstrip("!.,?")
+    if _raw_q in _GREETINGS and not (file and file.filename):
+        _greet = {
+            "hi": "नमस्ते! 🌾 मैं आपका AI कृषि सहायक हूं। आज मैं आपकी क्या मदद कर सकता हूं? फसल रोग, सिंचाई, सरकारी योजनाएं या मौसम आधारित सलाह के बारे में पूछें।",
+            "pa": "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! 🌾 ਮੈਂ ਤੁਹਾਡਾ AI ਖੇਤੀਬਾੜੀ ਸਹਾਇਕ ਹਾਂ। ਅੱਜ ਮੈਂ ਤੁਹਾਡੀ ਕਿਵੇਂ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?",
+        }.get((language or "en").lower(),
+              "Hello! 👋 I'm your AI Farming Assistant. How can I help you today? "
+              "Ask me about crop diseases, irrigation, government schemes, MSP rates, "
+              "or upload a leaf photo for instant disease diagnosis.")
+        return {
+            "response": _greet, "detected": None, "confidence": None,
+            "top3": None, "language": language or "en",
+            "weather": None, "policies": [],
+        }
+
     try:
         diagnosis  = ""
         confidence = 0.0
@@ -657,9 +674,14 @@ async def ask_farmer_bot(
             db  = get_db()
             cur = db.cursor()
             try:
+                # Verify user_id exists locally (JWT may come from a different DB instance)
+                safe_uid = None
+                if user_id is not None:
+                    cur.execute("SELECT id FROM users WHERE id = %s", (user_id,))
+                    safe_uid = user_id if cur.fetchone() else None
                 cur.execute(
                     "INSERT INTO chat_history (user_id, user_query, ai_response) VALUES (%s, %s, %s)",
-                    (user_id, query or f"[Image scan: {diagnosis}]", ai_msg),
+                    (safe_uid, query or f"[Image scan: {diagnosis}]", ai_msg),
                 )
                 db.commit()
             finally:
