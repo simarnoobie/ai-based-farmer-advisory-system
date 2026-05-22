@@ -344,11 +344,17 @@ async function sendMessage() {
 }
 
 // ── Image attachment helpers ───────────────────────────────────────
+const imageChip    = document.getElementById("imageChip");
+const clearImgBtn  = document.getElementById("clearImgBtn");
+const uploadLabel  = document.getElementById("uploadLabel");
+
 function clearImageAttachment() {
     pendingFile = null;
     imageInput.value = "";
-    document.getElementById("imagePreviewBar").style.display = "none";
-    document.getElementById("imageThumb").src = "";
+    imageChip.style.display   = "none";
+    imageChip.textContent     = "";
+    clearImgBtn.style.display = "none";
+    uploadLabel.classList.remove("attached");
     userInput.placeholder = "Ask your farming question…";
 }
 
@@ -356,12 +362,15 @@ function clearImageAttachment() {
 imageInput.addEventListener("change", (e) => {
     if (!e.target.files.length) return;
     pendingFile = e.target.files[0];
-    const url = URL.createObjectURL(pendingFile);
-    document.getElementById("imageThumb").src = url;
-    document.getElementById("imagePreviewLabel").textContent =
-        `📸 ${pendingFile.name}  —  type a question or click Send to diagnose`;
-    document.getElementById("imagePreviewBar").style.display = "flex";
-    userInput.placeholder = "Add a question about this image (optional)…";
+    // Show filename chip inside the text input wrapper
+    const name = pendingFile.name.length > 18
+        ? pendingFile.name.slice(0, 16) + "…"
+        : pendingFile.name;
+    imageChip.textContent     = "📸 " + name;
+    imageChip.style.display   = "inline-flex";
+    clearImgBtn.style.display = "flex";
+    uploadLabel.classList.add("attached");
+    userInput.placeholder = "Add a question (optional)…";
     userInput.focus();
 });
 
