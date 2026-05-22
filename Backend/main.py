@@ -163,7 +163,7 @@ def _init_db() -> None:
     conn.close()
     log.info("Database schema ready.")
 
-_db_pool: Optional[pooling.MySQLConnectionPool] = None
+_db_pool: pooling.MySQLConnectionPool | None = None
 
 def _create_pool() -> None:
     global _db_pool
@@ -314,7 +314,7 @@ def create_token(user_id: int, username: str) -> str:
 def decode_token(token: str) -> dict:
     return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
 
-async def get_optional_user(authorization: Optional[str] = Header(None)) -> Optional[dict]:
+async def get_optional_user(authorization: str | None = Header(None)) -> dict | None:
     if not authorization or not authorization.startswith("Bearer "):
         return None
     try:
@@ -326,7 +326,7 @@ async def get_optional_user(authorization: Optional[str] = Header(None)) -> Opti
     except Exception:
         return None
 
-async def require_user(authorization: Optional[str] = Header(None)) -> dict:
+async def require_user(authorization: str | None = Header(None)) -> dict:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Authentication required.")
     try:
@@ -346,7 +346,7 @@ async def require_user(authorization: Optional[str] = Header(None)) -> dict:
 # ---------------------------------------------------------------------------
 # Weather helper
 # ---------------------------------------------------------------------------
-def get_weather_context(lat: Optional[float], lon: Optional[float]) -> str:
+def get_weather_context(lat: float | None, lon: float | None) -> str:
     if lat is None or lon is None:
         return "Weather context unavailable."
     try:
@@ -571,18 +571,18 @@ async def feedback_summary():
 @app.post("/ask")
 async def ask_farmer_bot(
     request: Request,
-    _auth:             Optional[dict]  = Depends(get_optional_user),
-    query:             Optional[str]   = Form(None),
+    _auth:             dict | None  = Depends(get_optional_user),
+    query:             str | None   = Form(None),
     file:              UploadFile      = File(None),
     language:          str             = Form("en"),
-    crop_type:         Optional[str]   = Form(None),
-    season:            Optional[str]   = Form(None),
-    land_size:         Optional[str]   = Form(None),
-    irrigation_type:   Optional[str]   = Form(None),
-    groundwater_stress: Optional[bool] = Form(None),
-    msp_dependency:    Optional[bool]  = Form(None),
-    latitude:          Optional[float] = Form(None),
-    longitude:         Optional[float] = Form(None),
+    crop_type:         str | None   = Form(None),
+    season:            str | None   = Form(None),
+    land_size:         str | None   = Form(None),
+    irrigation_type:   str | None   = Form(None),
+    groundwater_stress: bool | None = Form(None),
+    msp_dependency:    bool | None  = Form(None),
+    latitude:          float | None = Form(None),
+    longitude:         float | None = Form(None),
 ):
     # Rate limiting
     client_ip = request.client.host if request.client else "unknown"

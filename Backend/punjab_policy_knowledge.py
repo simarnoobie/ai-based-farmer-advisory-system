@@ -1,10 +1,8 @@
-from typing import Dict, List
-
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-POLICY_DOCS: List[Dict[str, str]] = [
+POLICY_DOCS: list[dict[str, str]] = [
     {
         "title": "PM-KISAN",
         "content": "Provides Rs 6000 per year in 3 DBT installments to eligible landholding farmer families linked with Aadhaar.",
@@ -120,7 +118,7 @@ _vectorizer = TfidfVectorizer(stop_words="english", ngram_range=(1, 2))
 _tfidf_matrix = _vectorizer.fit_transform(_corpus)
 
 
-def retrieve_policy_context(query: str, top_k: int = 4) -> List[Dict[str, str]]:
+def retrieve_policy_context(query: str, top_k: int = 4) -> list[dict[str, str]]:
     if not query or not query.strip():
         return []
     query_vec = _vectorizer.transform([query.lower()])

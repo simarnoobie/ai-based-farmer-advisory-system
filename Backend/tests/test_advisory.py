@@ -96,7 +96,9 @@ def test_ask_image_diagnosis(client, fake_db):
 
     assert resp.status_code == 200
     data = resp.json()
-    assert data["detected"] == "Tomato_healthy"
+    assert data["detected"] == "Tomato — Healthy"
+    assert data["is_healthy"] is True
+    assert data["no_plant"] is False
     assert data["confidence"] == pytest.approx(0.95, abs=0.01)
     assert isinstance(data["top3"], list)
     assert len(data["top3"]) == 3
