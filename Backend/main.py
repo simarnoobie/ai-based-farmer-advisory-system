@@ -304,24 +304,28 @@ def create_token(user_id: int, username: str) -> str:
 def decode_token(token: str) -> dict:
     return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
 
-async def get_optional_user(authorization: Optional[str] = Header(None)) -> Optional[int]:
+async def get_optional_user(authorization: Optional[str] = Header(None)) -> Optional[dict]:
     if not authorization or not authorization.startswith("Bearer "):
         return None
     try:
         payload = decode_token(authorization.split(" ", 1)[1])
-        return payload.get("user_id")
+        uid = payload.get("user_id")
+        if uid is None:
+            return None
+        return {"user_id": uid, "username": payload.get("sub")}
     except Exception:
         return None
 
-async def require_user(authorization: Optional[str] = Header(None)) -> int:
+async def require_user(authorization: Optional[str] = Header(None)) -> dict:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Authentication required.")
     try:
         payload = decode_token(authorization.split(" ", 1)[1])
         uid = payload.get("user_id")
+        username = payload.get("sub")
         if uid is None:
             raise HTTPException(401, "Invalid token.")
-        return uid
+        return {"user_id": uid, "username": username}
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Token expired. Please log in again.")
     except HTTPException:
@@ -479,17 +483,42 @@ async def submit_feedback(request: FeedbackRequest):
 @app.get("/history")
 async def get_chat_history(
     limit: int = 20,
-    user_id: int = Depends(require_user),
+    auth: dict = Depends(require_user),
 ):
+    jwt_uid      = auth["user_id"]
+    jwt_username = auth.get("username")
     db  = get_db()
     cur = db.cursor(dictionary=True)
     try:
-        cur.execute(
-            "SELECT user_query, ai_response, created_at "
-            "FROM chat_history WHERE user_id = %s "
-            "ORDER BY created_at DESC LIMIT %s",
-            (user_id, min(limit, 100)),
-        )
+        # Try matching by username first (cross-environment safe),
+        # then fall back to user_id, then return anonymous history.
+        local_uid = None
+        if jwt_username:
+            cur.execute("SELECT id FROM users WHERE username = %s", (jwt_username,))
+            row = cur.fetchone()
+            if row:
+                local_uid = row["id"]
+        if local_uid is None:
+            cur.execute("SELECT id FROM users WHERE id = %s", (jwt_uid,))
+            row = cur.fetchone()
+            if row:
+                local_uid = row["id"]
+
+        if local_uid is not None:
+            cur.execute(
+                "SELECT user_query, ai_response, created_at "
+                "FROM chat_history WHERE user_id = %s "
+                "ORDER BY created_at DESC LIMIT %s",
+                (local_uid, min(limit, 100)),
+            )
+        else:
+            # Fallback: return anonymous history (saved when FK user didn't exist)
+            cur.execute(
+                "SELECT user_query, ai_response, created_at "
+                "FROM chat_history WHERE user_id IS NULL "
+                "ORDER BY created_at DESC LIMIT %s",
+                (min(limit, 100),),
+            )
         rows = cur.fetchall()
         return {"history": rows, "count": len(rows)}
     finally:
@@ -532,7 +561,7 @@ async def feedback_summary():
 @app.post("/ask")
 async def ask_farmer_bot(
     request: Request,
-    user_id:           Optional[int]   = Depends(get_optional_user),
+    _auth:             Optional[dict]  = Depends(get_optional_user),
     query:             Optional[str]   = Form(None),
     file:              UploadFile      = File(None),
     language:          str             = Form("en"),
@@ -636,19 +665,23 @@ async def ask_farmer_bot(
                 "role": "system",
                 "content": (
                     f"{lang_instruction}\n\n"
-                    "You are a professional agronomist advising Punjab farmers. "
-                    "Use the Punjab policy context and weather data when relevant. "
-                    "Give concise, practical steps in under 150 words. "
-                    "Do not mix languages or scripts in a single response."
+                    "You are an expert agronomist. Answer the farmer's question directly and specifically.\n"
+                    "RULES:\n"
+                    "1. Answer ONLY what was asked — no padding, no unasked topics.\n"
+                    "2. Give specific numbers, quantities, and timings where possible.\n"
+                    "3. Keep the response under 120 words.\n"
+                    "4. Only mention a government scheme if it directly helps with the question asked.\n"
+                    "5. Do NOT start with 'Sir', greetings, or filler phrases.\n"
+                    "6. Do not mix languages or scripts."
                 ),
             },
             {
                 "role": "user",
                 "content": (
-                    f"Farmer query: {user_input}\n"
+                    f"Question: {user_input}\n"
                     f"Farmer profile: {profile}\n"
                     f"Weather: {weather}\n"
-                    f"Punjab policy snippets:\n{policy_block}"
+                    f"Relevant policy context (use only if directly applicable):\n{policy_block}"
                 ),
             },
         ]
@@ -672,13 +705,23 @@ async def ask_farmer_bot(
         # --- Persist to chat history (non-fatal) ---
         try:
             db  = get_db()
-            cur = db.cursor()
+            cur = db.cursor(dictionary=True)
             try:
-                # Verify user_id exists locally (JWT may come from a different DB instance)
                 safe_uid = None
-                if user_id is not None:
-                    cur.execute("SELECT id FROM users WHERE id = %s", (user_id,))
-                    safe_uid = user_id if cur.fetchone() else None
+                if _auth is not None:
+                    jwt_uid  = _auth.get("user_id")
+                    jwt_uname = _auth.get("username")
+                    # Try username first (cross-environment safe), then user_id
+                    if jwt_uname:
+                        cur.execute("SELECT id FROM users WHERE username = %s", (jwt_uname,))
+                        row = cur.fetchone()
+                        if row:
+                            safe_uid = row["id"]
+                    if safe_uid is None and jwt_uid is not None:
+                        cur.execute("SELECT id FROM users WHERE id = %s", (jwt_uid,))
+                        row = cur.fetchone()
+                        if row:
+                            safe_uid = row["id"]
                 cur.execute(
                     "INSERT INTO chat_history (user_id, user_query, ai_response) VALUES (%s, %s, %s)",
                     (safe_uid, query or f"[Image scan: {diagnosis}]", ai_msg),
