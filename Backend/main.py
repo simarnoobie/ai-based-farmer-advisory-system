@@ -200,6 +200,16 @@ CLASSES = [
     'Tomato_target_spot', 'Tomato_mosaic_virus', 'Tomato_yellow_leaf_curl_virus',
 ]
 
+def _fmt_class(raw: str) -> tuple:
+    """Return (display_label, is_healthy, no_plant) from a raw class name like 'Corn_healthy'."""
+    if raw == "Background_without_leaves":
+        return "No plant detected", False, True
+    parts = raw.replace("_(maize)", "").split("_")
+    plant     = parts[0].capitalize()
+    condition = " ".join(p.capitalize() for p in parts[1:])
+    is_healthy = condition.lower() == "healthy"
+    return f"{plant} — {condition}", is_healthy, False
+
 def _ensure_model_weights() -> None:
     if MODEL_PATH.exists():
         return
@@ -601,6 +611,8 @@ async def ask_farmer_bot(
         diagnosis  = ""
         confidence = 0.0
         top3: list = []
+        is_healthy = False
+        no_plant   = False
         user_input = (query or "").strip() or "Provide general agricultural advice."
 
         # --- Image diagnosis ---
@@ -616,14 +628,36 @@ async def ask_farmer_bot(
                 img_array = np.expand_dims(np.array(img, dtype="float32"), axis=0)
                 preds_arr = MODEL.predict(img_array, verbose=0)[0]
                 top_idx   = np.argsort(preds_arr)[::-1][:3]
-                diagnosis  = CLASSES[int(top_idx[0])]
+                _raw_cls   = CLASSES[int(top_idx[0])]
+                diag_label, is_healthy, no_plant = _fmt_class(_raw_cls)
+                diagnosis  = diag_label
                 confidence = float(preds_arr[top_idx[0]])
                 top3 = [
-                    {"class": CLASSES[int(i)], "confidence": round(float(preds_arr[i]), 3)}
+                    {"class": _fmt_class(CLASSES[int(i)])[0], "confidence": round(float(preds_arr[i]), 3)}
                     for i in top_idx
                 ]
-                user_input = f"The plant is diagnosed with {diagnosis} (confidence: {confidence:.0%}). {user_input}"
-                log.info("Image diagnosed: %s (%.0f%%)", diagnosis, confidence * 100)
+                # Build a context-appropriate prompt for the LLM
+                _base_q = (query or "").strip() or ""
+                if no_plant:
+                    user_input = (
+                        "The uploaded image does not appear to show a plant leaf. "
+                        "Politely ask the user to upload a clear, close-up photo of the leaf."
+                    )
+                elif is_healthy:
+                    user_input = (
+                        f"The plant scan shows: {diag_label} (model confidence: {confidence:.0%}). "
+                        f"The plant appears HEALTHY — no disease detected. "
+                        + (_base_q if _base_q else
+                           "Give 3-4 specific tips to keep this crop healthy and prevent common diseases.")
+                    )
+                else:
+                    user_input = (
+                        f"The plant scan shows: {diag_label} (model confidence: {confidence:.0%}). "
+                        + (_base_q if _base_q else
+                           f"Explain what {diag_label} is, how severe it is, "
+                           f"and give specific treatment steps and prevention measures.")
+                    )
+                log.info("Image diagnosed: %s (healthy=%s, %.0f%%)", diag_label, is_healthy, confidence * 100)
             except HTTPException:
                 raise
             except Exception:
@@ -747,13 +781,15 @@ async def ask_farmer_bot(
 
         has_image = bool(file and file.filename)
         return {
-            "response":   ai_msg,
-            "detected":   diagnosis   if has_image else None,
-            "confidence": round(confidence, 3) if has_image else None,
-            "top3":       top3        if has_image else None,
-            "language":   language,
-            "weather":    weather,
-            "policies":   [{"title": p["title"], "source": p["source"]} for p in policy_hits],
+            "response":    ai_msg,
+            "detected":    diagnosis    if has_image else None,
+            "confidence":  round(confidence, 3) if has_image else None,
+            "top3":        top3         if has_image else None,
+            "is_healthy":  is_healthy   if has_image else None,
+            "no_plant":    no_plant     if has_image else None,
+            "language":    language,
+            "weather":     weather,
+            "policies":    [{"title": p["title"], "source": p["source"]} for p in policy_hits],
         }
 
     except HTTPException:

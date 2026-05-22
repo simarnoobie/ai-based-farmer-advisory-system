@@ -291,6 +291,7 @@ async function sendMessage() {
         let output = safeResponse;
 
         if (data.detected) {
+            // Confidence label + color
             let confLabel = "";
             let confColor = "#888";
             if (data.confidence != null) {
@@ -299,11 +300,23 @@ async function sendMessage() {
                 else if (pct >= 55) { confColor = "#e67e22"; confLabel = `${pct}% — Moderate confidence`; }
                 else                { confColor = "#c0392b"; confLabel = `${pct}% — Low confidence, verify manually`; }
             }
-            const pct = confLabel
-                ? ` <span style="color:${confColor};font-size:0.82rem" title="Model certainty: how sure the AI is about this disease based on the leaf image">(${confLabel})</span>`
+            const confSpan = confLabel
+                ? ` <span style="color:${confColor};font-size:0.82rem" title="How certain the AI model is based on the leaf image pattern">(${confLabel})</span>`
                 : "";
-            output = `<strong>🔬 Diagnosis:</strong> ${escapeHtml(data.detected)}${pct}<br><br>${safeResponse}`;
-            if (Array.isArray(data.top3) && data.top3.length > 1) {
+
+            // Header line differs for healthy / diseased / no-plant
+            let diagHeader;
+            if (data.no_plant) {
+                diagHeader = `<strong style="color:#888">❓ Scan result:</strong> ${escapeHtml(data.detected)}${confSpan}`;
+            } else if (data.is_healthy) {
+                diagHeader = `<strong style="color:#1e8a4a">✅ Plant Status:</strong> ${escapeHtml(data.detected)}${confSpan}`;
+            } else {
+                diagHeader = `<strong style="color:#c0392b">⚠️ Disease Detected:</strong> ${escapeHtml(data.detected)}${confSpan}`;
+            }
+
+            output = `${diagHeader}<br><br>${safeResponse}`;
+
+            if (!data.no_plant && Array.isArray(data.top3) && data.top3.length > 1) {
                 const alts = data.top3.slice(1)
                     .map(p => `${escapeHtml(p.class)} (${Math.round(p.confidence * 100)}%)`)
                     .join(" · ");
